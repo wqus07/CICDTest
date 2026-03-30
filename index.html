@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>本地文件工具箱</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+      color: #f8fafc;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: #1e2330;
+      border: 1px solid #2d3748;
+      border-radius: 12px;
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 640px;
+      margin-bottom: 1.2rem;
+    }
+
+    .card h2 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+    }
+
+    /* Drop Zone */
+    #drop-zone {
+      border: 2px dashed #3b4a6b;
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: #64748b;
+      font-size: 0.9rem;
+    }
+    #drop-zone:hover, #drop-zone.drag-over {
+      border-color: #6366f1;
+      background: #1a1f35;
+      color: #a5b4fc;
+    }
+    #drop-zone .icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    #file-input { display: none; }
+
+    /* File list */
+    #file-list { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+
+    .file-item {
+      background: #111827;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      animation: fadeIn 0.2s ease;
+    }
+    .file-item .name { color: #e2e8f0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px; }
+    .file-item .meta { color: #475569; font-size: 0.75rem; margin-left: 1rem; white-space: nowrap; }
+    .file-item .preview-btn {
+      background: #2d3748;
+      border: none;
+      color: #a5b4fc;
+      border-radius: 6px;
+      padding: 0.3rem 0.7rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      margin-left: 0.75rem;
+      transition: background 0.15s;
+    }
+    .file-item .preview-btn:hover { background: #3b4a6b; }
+
+    /* Preview Panel */
+    #preview-panel {
+      display: none;
+      margin-top: 1rem;
+      background: #111827;
+      border-radius: 8px;
+      padding: 1rem;
+    }
+    #preview-panel h3 { font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem; }
+    #preview-content {
+      font-size: 0.82rem;
+      color: #94a3b8;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 200px;
+      overflow-y: auto;
+      line-height: 1.6;
+    }
+
+    /* Counter section */
+    .counter-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .count-display {
+      font-size: 3rem;
+      font-weight: 700;
+      color: #6366f1;
+      min-width: 80px;
+      text-align: center;
+      line-height: 1;
+    }
+
+    .btn-group { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 0.6rem 1.2rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-primary { background: #6366f1; color: #fff; }
+    .btn-primary:hover { background: #4f46e5; }
+    .btn-secondary { background: #2d3748; color: #e2e8f0; }
+    .btn-secondary:hover { background: #3b4a6b; }
+    .btn-danger { background: #7f1d1d; color: #fca5a5; }
+    .btn-danger:hover { background: #991b1b; }
+
+    /* Color picker */
+    .color-row { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; }
+
+    .swatch {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .swatch:hover, .swatch.active { transform: scale(1.15); border-color: #fff; }
+
+    .swatch-indigo  { background: #6366f1; }
+    .swatch-cyan    { background: #06b6d4; }
+    .swatch-emerald { background: #10b981; }
+    .swatch-amber   { background: #f59e0b; }
+    .swatch-red     { background: #ef4444; }
+    .swatch-pink    { background: #ec4899; }
+
+    #bg-preview {
+      flex: 1;
+      min-width: 100px;
+      height: 36px;
+      border-radius: 8px;
+      transition: background 0.3s;
+      border: 1px solid #2d3748;
+      background: #6366f1;
+    }
+
+    /* Notes */
+    #note-input {
+      width: 100%;
+      background: #111827;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      color: #e2e8f0;
+      padding: 0.75rem;
+      font-size: 0.875rem;
+      resize: vertical;
+      min-height: 80px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    #note-input:focus { border-color: #6366f1; }
+
+    .note-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+
+    #note-list { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+    .note-item {
+      background: #111827;
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-size: 0.85rem;
+      color: #cbd5e1;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.5rem;
+      animation: fadeIn 0.2s ease;
+    }
+    .note-item .note-text { flex: 1; line-height: 1.5; }
+    .note-item .note-time { font-size: 0.7rem; color: #475569; white-space: nowrap; }
+    .note-item .del-btn { background: none; border: none; color: #475569; cursor: pointer; font-size: 1rem; padding: 0; line-height: 1; }
+    .note-item .del-btn:hover { color: #f87171; }
+
+    /* Status bar */
+    #status-bar {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 20px;
+      padding: 0.5rem 1.2rem;
+      font-size: 0.82rem;
+      color: #94a3b8;
+      transition: transform 0.3s ease;
+      white-space: nowrap;
+    }
+    #status-bar.show { transform: translateX(-50%) translateY(0); }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+<h1>🛠 本地文件工具箱</h1>
+<p class="subtitle">纯前端 · 无服务器 · 数据不离开本地</p>
+
+<!-- 文件读取 -->
+<div class="card">
+  <h2>📂 本地文件读取</h2>
+  <div id="drop-zone">
+    <div class="icon">⬆️</div>
+    <div>拖拽文件到这里，或点击选择文件</div>
+    <div class="drop-hint">支持文本 / 图片 / 任意文件</div>
+  </div>
+  <input type="file" id="file-input" multiple>
+  <div id="file-list"></div>
+  <div id="preview-panel">
+    <h3 id="preview-title">文件预览</h3>
+    <div id="preview-content"></div>
+  </div>
+</div>
+
+<!-- 计数器 -->
+<div class="card">
+  <h2>🔢 计数器</h2>
+  <div class="counter-row">
+    <div class="count-display" id="count">0</div>
+    <div class="btn-group">
+      <button type="button" class="btn-primary" onclick="changeCount(1)">＋ 加一</button>
+      <button type="button" class="btn-secondary" onclick="changeCount(-1)">－ 减一</button>
+      <button type="button" class="btn-secondary" onclick="changeCount(10)">＋10</button>
+      <button type="button" class="btn-danger" onclick="resetCount()">重置</button>
+    </div>
+  </div>
+</div>
+
+<!-- 颜色主题 -->
+<div class="card">
+  <h2>🎨 背景色预览</h2>
+  <div class="color-row">
+    <button type="button" class="swatch swatch-indigo  active" data-color="#6366f1" onclick="setColor(this)" aria-label="靛蓝色"></button>
+    <button type="button" class="swatch swatch-cyan"           data-color="#06b6d4" onclick="setColor(this)" aria-label="青色"></button>
+    <button type="button" class="swatch swatch-emerald"        data-color="#10b981" onclick="setColor(this)" aria-label="翠绿色"></button>
+    <button type="button" class="swatch swatch-amber"          data-color="#f59e0b" onclick="setColor(this)" aria-label="琥珀色"></button>
+    <button type="button" class="swatch swatch-red"            data-color="#ef4444" onclick="setColor(this)" aria-label="红色"></button>
+    <button type="button" class="swatch swatch-pink"           data-color="#ec4899" onclick="setColor(this)" aria-label="粉色"></button>
+    <div id="bg-preview"></div>
+  </div>
+</div>
+
+<!-- 便签 -->
+<div class="card">
+  <h2>📝 临时便签</h2>
+  <textarea id="note-input" placeholder="记点什么…（刷新后会清空）"></textarea>
+  <div class="note-actions">
+    <button type="button" class="btn-primary" onclick="addNote()">保存便签</button>
+    <button type="button" class="btn-secondary" onclick="exportNotes()">导出为 .txt</button>
+  </div>
+  <div id="note-list"></div>
+</div>
+
+<div id="status-bar">✅ 操作成功</div>
+
+<script>
+  // ── 文件读取 ──
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const fileList = document.getElementById('file-list');
+  const previewPanel = document.getElementById('preview-panel');
+  const previewContent = document.getElementById('preview-content');
+  const previewTitle = document.getElementById('preview-title');
+
+  dropZone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    handleFiles(e.dataTransfer.files);
+  });
+
+  function handleFiles(files) {
+    [...files].forEach(file => {
+      const item = document.createElement('div');
+      item.className = 'file-item';
+      item.innerHTML = `
+        <span class="name">📄 ${escapeHtml(file.name)}</span>
+        <span class="meta">${formatSize(file.size)} · ${escapeHtml(file.type || '未知类型')}</span>
+        <button type="button" class="preview-btn" onclick="previewFile(this)">预览</button>
+      `;
+      item._file = file;
+      fileList.appendChild(item);
+    });
+    toast(`已加载 ${files.length} 个文件`);
+  }
+
+  function previewFile(btn) {
+    const item = btn.closest('.file-item');
+    const file = item._file;
+    previewTitle.textContent = `预览：${file.name}`;
+    previewPanel.style.display = 'block';
+
+    if (file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      previewContent.innerHTML = `<img src="${url}" style="max-width:100%;border-radius:6px;" alt="${escapeHtml(file.name)}">`;
+    } else if (file.type.startsWith('text/') || file.name.match(/\.(md|json|yml|yaml|js|ts|c|h|py|sh|txt|csv)$/i)) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        previewContent.textContent = e.target.result.slice(0, 3000) +
+          (e.target.result.length > 3000 ? '\n…（内容过长已截断）' : '');
+      };
+      reader.readAsText(file);
+    } else {
+      previewContent.textContent = `[无法预览此文件类型: ${file.type || '未知'}]`;
+    }
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  // ── 计数器 ──
+  let count = 0;
+  function changeCount(delta) {
+    count += delta;
+    document.getElementById('count').textContent = count;
+  }
+  function resetCount() {
+    count = 0;
+    document.getElementById('count').textContent = 0;
+    toast('计数已重置');
+  }
+
+  // ── 颜色 ──
+  function setColor(el) {
+    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('bg-preview').style.background = el.dataset.color;
+  }
+
+  // ── 便签 ──
+  const notes = [];
+  function addNote() {
+    const input = document.getElementById('note-input');
+    const text = input.value.trim();
+    if (!text) return;
+    const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    const idx = notes.length;
+    notes.push(text);
+    const item = document.createElement('div');
+    item.className = 'note-item';
+    item.innerHTML = `
+      <span class="note-text">${escapeHtml(text)}</span>
+      <span class="note-time">${time}</span>
+      <button type="button" class="del-btn" onclick="deleteNote(this, ${idx})">✕</button>
+    `;
+    document.getElementById('note-list').prepend(item);
+    input.value = '';
+    toast('便签已保存');
+  }
+
+  function deleteNote(btn, idx) {
+    notes[idx] = null;
+    btn.closest('.note-item').remove();
+  }
+
+  function exportNotes() {
+    const content = notes.filter(Boolean).join('\n---\n');
+    if (!content) { toast('没有便签可导出'); return; }
+    const blob = new Blob([content], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `notes_${Date.now()}.txt`;
+    a.click();
+    toast('便签已导出');
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Toast ──
+  const statusBar = document.getElementById('status-bar');
+  let toastTimer;
+  function toast(msg) {
+    statusBar.textContent = msg;
+    statusBar.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => statusBar.classList.remove('show'), 2500);
+  }
+
+  // Cmd+Enter 保存便签
+  document.getElementById('note-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.metaKey) addNote();
+  });
+</script>
+</body>
+</html>
