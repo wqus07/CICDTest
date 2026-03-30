@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>本地文件工具箱</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -162,6 +162,13 @@
     }
     .swatch:hover, .swatch.active { transform: scale(1.15); border-color: #fff; }
 
+    .swatch-indigo  { background: #6366f1; }
+    .swatch-cyan    { background: #06b6d4; }
+    .swatch-emerald { background: #10b981; }
+    .swatch-amber   { background: #f59e0b; }
+    .swatch-red     { background: #ef4444; }
+    .swatch-pink    { background: #ec4899; }
+
     #bg-preview {
       flex: 1;
       min-width: 100px;
@@ -169,6 +176,7 @@
       border-radius: 8px;
       transition: background 0.3s;
       border: 1px solid #2d3748;
+      background: #6366f1;
     }
 
     /* Notes */
@@ -242,9 +250,9 @@
   <div id="drop-zone">
     <div class="icon">⬆️</div>
     <div>拖拽文件到这里，或点击选择文件</div>
-    <div style="font-size:0.75rem;margin-top:0.3rem;color:#475569">支持文本 / 图片 / 任意文件</div>
+    <div class="drop-hint">支持文本 / 图片 / 任意文件</div>
   </div>
-  <input type="file" id="file-input" multiple />
+  <input type="file" id="file-input" multiple>
   <div id="file-list"></div>
   <div id="preview-panel">
     <h3 id="preview-title">文件预览</h3>
@@ -258,10 +266,10 @@
   <div class="counter-row">
     <div class="count-display" id="count">0</div>
     <div class="btn-group">
-      <button class="btn-primary" onclick="changeCount(1)">＋ 加一</button>
-      <button class="btn-secondary" onclick="changeCount(-1)">－ 减一</button>
-      <button class="btn-secondary" onclick="changeCount(10)">＋10</button>
-      <button class="btn-danger" onclick="resetCount()">重置</button>
+      <button type="button" class="btn-primary" onclick="changeCount(1)">＋ 加一</button>
+      <button type="button" class="btn-secondary" onclick="changeCount(-1)">－ 减一</button>
+      <button type="button" class="btn-secondary" onclick="changeCount(10)">＋10</button>
+      <button type="button" class="btn-danger" onclick="resetCount()">重置</button>
     </div>
   </div>
 </div>
@@ -270,13 +278,13 @@
 <div class="card">
   <h2>🎨 背景色预览</h2>
   <div class="color-row">
-    <div class="swatch active" style="background:#6366f1" data-color="#6366f1" onclick="setColor(this)"></div>
-    <div class="swatch" style="background:#06b6d4" data-color="#06b6d4" onclick="setColor(this)"></div>
-    <div class="swatch" style="background:#10b981" data-color="#10b981" onclick="setColor(this)"></div>
-    <div class="swatch" style="background:#f59e0b" data-color="#f59e0b" onclick="setColor(this)"></div>
-    <div class="swatch" style="background:#ef4444" data-color="#ef4444" onclick="setColor(this)"></div>
-    <div class="swatch" style="background:#ec4899" data-color="#ec4899" onclick="setColor(this)"></div>
-    <div id="bg-preview" style="background:#6366f1"></div>
+    <button type="button" class="swatch swatch-indigo  active" data-color="#6366f1" onclick="setColor(this)"></button>
+    <button type="button" class="swatch swatch-cyan"           data-color="#06b6d4" onclick="setColor(this)"></button>
+    <button type="button" class="swatch swatch-emerald"        data-color="#10b981" onclick="setColor(this)"></button>
+    <button type="button" class="swatch swatch-amber"          data-color="#f59e0b" onclick="setColor(this)"></button>
+    <button type="button" class="swatch swatch-red"            data-color="#ef4444" onclick="setColor(this)"></button>
+    <button type="button" class="swatch swatch-pink"           data-color="#ec4899" onclick="setColor(this)"></button>
+    <div id="bg-preview"></div>
   </div>
 </div>
 
@@ -285,13 +293,13 @@
   <h2>📝 临时便签</h2>
   <textarea id="note-input" placeholder="记点什么…（刷新后会清空）"></textarea>
   <div class="note-actions">
-    <button class="btn-primary" onclick="addNote()">保存便签</button>
-    <button class="btn-secondary" onclick="exportNotes()">导出为 .txt</button>
+    <button type="button" class="btn-primary" onclick="addNote()">保存便签</button>
+    <button type="button" class="btn-secondary" onclick="exportNotes()">导出为 .txt</button>
   </div>
   <div id="note-list"></div>
 </div>
 
-<div id="status-bar" id="toast">✅ 操作成功</div>
+<div id="status-bar">✅ 操作成功</div>
 
 <script>
   // ── 文件读取 ──
@@ -318,9 +326,9 @@
       const item = document.createElement('div');
       item.className = 'file-item';
       item.innerHTML = `
-        <span class="name">📄 ${file.name}</span>
-        <span class="meta">${formatSize(file.size)} · ${file.type || '未知类型'}</span>
-        <button class="preview-btn" onclick="previewFile(this)">预览</button>
+        <span class="name">📄 ${escapeHtml(file.name)}</span>
+        <span class="meta">${formatSize(file.size)} · ${escapeHtml(file.type || '未知类型')}</span>
+        <button type="button" class="preview-btn" onclick="previewFile(this)">预览</button>
       `;
       item._file = file;
       fileList.appendChild(item);
@@ -336,10 +344,13 @@
 
     if (file.type.startsWith('image/')) {
       const url = URL.createObjectURL(file);
-      previewContent.innerHTML = `<img src="${url}" style="max-width:100%;border-radius:6px;" />`;
+      previewContent.innerHTML = `<img src="${url}" style="max-width:100%;border-radius:6px;" alt="${escapeHtml(file.name)}">`;
     } else if (file.type.startsWith('text/') || file.name.match(/\.(md|json|yml|yaml|js|ts|c|h|py|sh|txt|csv)$/i)) {
       const reader = new FileReader();
-      reader.onload = e => { previewContent.textContent = e.target.result.slice(0, 3000) + (e.target.result.length > 3000 ? '\n…（内容过长已截断）' : ''); };
+      reader.onload = e => {
+        previewContent.textContent = e.target.result.slice(0, 3000) +
+          (e.target.result.length > 3000 ? '\n…（内容过长已截断）' : '');
+      };
       reader.readAsText(file);
     } else {
       previewContent.textContent = `[无法预览此文件类型: ${file.type || '未知'}]`;
@@ -385,7 +396,7 @@
     item.innerHTML = `
       <span class="note-text">${escapeHtml(text)}</span>
       <span class="note-time">${time}</span>
-      <button class="del-btn" onclick="deleteNote(this, ${idx})">✕</button>
+      <button type="button" class="del-btn" onclick="deleteNote(this, ${idx})">✕</button>
     `;
     document.getElementById('note-list').prepend(item);
     input.value = '';
@@ -422,7 +433,7 @@
     toastTimer = setTimeout(() => statusBar.classList.remove('show'), 2500);
   }
 
-  // Enter 保存便签
+  // Cmd+Enter 保存便签
   document.getElementById('note-input').addEventListener('keydown', e => {
     if (e.key === 'Enter' && e.metaKey) addNote();
   });
