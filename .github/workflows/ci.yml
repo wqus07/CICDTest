@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── 1. HTML 校验 ──────────────────────────────────────
+  validate:
+    name: Validate HTML
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install html-validate
+        run: npm install -g html-validate
+
+      - name: Run HTML validation
+        run: html-validate index.html
+
+  # ── 2. 文件体积检查 ──────────────────────────────────
+  size-check:
+    name: Size Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check file sizes
+        run: |
+          echo "=== File sizes ==="
+          find . -not -path './.git/*' -type f | while read f; do
+            size=$(wc -c < "$f")
+            echo "$size bytes  $f"
+            # 单文件超过 500KB 则警告
+            if [ "$size" -gt 512000 ]; then
+              echo "::warning file=$f::File exceeds 500KB"
+            fi
+          done
+
+  # ── 3. 生成产物（供下载） ───────────────────────────
+  build:
+    name: Build & Archive
+    runs-on: ubuntu-latest
+    needs: [validate]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Package release
+        run: |
+          mkdir -p dist
+          cp index.html dist/
+          # 注入 git commit hash 到 HTML 注释里
+          COMMIT=$(git rev-parse --short HEAD)
+          sed -i "s|</body>|<!-- build: $COMMIT -->\n</body>|" dist/index.html
+          echo "Build: $COMMIT" > dist/BUILD_INFO.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ github.sha }}
+          path: dist/
+          retention-days: 30
+
+  # ── 4. 部署到 GitHub Pages（仅 main 分支） ──────────
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          publish_branch: gh-pages
+          exclude_assets: '.github'
