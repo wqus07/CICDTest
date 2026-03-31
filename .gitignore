@@ -1,5 +1,31 @@
+# System files
 .DS_Store
 Thumbs.db
+
+# Build outputs
+build/
+*.o
+*.a
+*.elf
+*.hex
+*.bin
+
+# IDE
+.vscode/settings.json
+.vscode/extensions.json
+*.code-workspace
+
+# Keil MDK build artifacts
+MDK-ARM/Relay16CH_H750/
+*.uvguix.*
+*.build_log.htm
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment
+.env
 *.log
 node_modules/
-.env

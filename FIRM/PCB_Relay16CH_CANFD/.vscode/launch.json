@@ -1,24 +1,104 @@
 {
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "C/C++ Runner: Debug Session",
-      "type": "cppdbg",
-      "request": "launch",
-      "args": [],
-      "stopAtEntry": false,
-      "externalConsole": true,
-      "cwd": "e:/Project/PCBPrj/PCB_RelayBoard/FIRM/PCB_Relay16CH_CANFD/Src",
-      "program": "e:/Project/PCBPrj/PCB_RelayBoard/FIRM/PCB_Relay16CH_CANFD/Src/build/Debug/outDebug",
-      "MIMode": "gdb",
-      "miDebuggerPath": "gdb",
-      "setupCommands": [
+    "version": "0.2.0",
+    "configurations": [
         {
-          "description": "Enable pretty-printing for gdb",
-          "text": "-enable-pretty-printing",
-          "ignoreFailures": true
+            "name": "Debug with ST-Link (OpenOCD)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Relay16CH_H750.elf",
+            "args": [],
+            "stopAtEntry": true,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "arm-none-eabi-gdb",
+            "logging": {
+                "engineLogging": false
+            },
+            "preLaunchTask": "CMake: Build Debug",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Connect to OpenOCD",
+                    "text": "target extended-remote localhost:3333",
+                    "ignoreFailures": false
+                },
+                {
+                    "description": "Set debug speed",
+                    "text": "monitor speed 1000",
+                    "ignoreFailures": true
+                }
+            ],
+            "postDebugTask": "OpenOCD: Stop Server"
+        },
+        {
+            "name": "Debug with J-Link (OpenOCD)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Relay16CH_H750.elf",
+            "args": [],
+            "stopAtEntry": true,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "arm-none-eabi-gdb",
+            "logging": {
+                "engineLogging": false
+            },
+            "preLaunchTask": "CMake: Build Debug",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Connect to OpenOCD for J-Link",
+                    "text": "target extended-remote localhost:3333",
+                    "ignoreFailures": false
+                },
+                {
+                    "description": "Set debug speed",
+                    "text": "monitor speed 1000",
+                    "ignoreFailures": true
+                }
+            ],
+            "postDebugTask": "OpenOCD: Stop Server"
+        },
+        {
+            "name": "Debug with PyOCD",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Relay16CH_H750.elf",
+            "args": [],
+            "stopAtEntry": true,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "arm-none-eabi-gdb",
+            "logging": {
+                "engineLogging": false
+            },
+            "preLaunchTask": "CMake: Build Debug",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Connect to PyOCD",
+                    "text": "target extended-remote localhost:3333",
+                    "ignoreFailures": false
+                }
+            ]
         }
-      ]
-    }
-  ]
+    ]
 }
