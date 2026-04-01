@@ -1,5 +1,20 @@
 {
     "version": "2.0.0",
+    "options": {
+        "shell": {
+            "executable": "powershell.exe",
+            "args": [
+                "-NoLogo",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command"
+            ]
+        },
+        "env": {
+            "PATH": "${env:LOCALAPPDATA}\\Microsoft\\WinGet\\Packages\\Ninja-build.Ninja_Microsoft.Winget.Source_8wekyb3d8bbwe;${env:LOCALAPPDATA}\\Microsoft\\WinGet\\Packages\\xpack-dev-tools.openocd-xpack_Microsoft.Winget.Source_8wekyb3d8bbwe\\xpack-openocd-0.12.0-7\\bin;${env:PATH}"
+        }
+    },
     "tasks": [
         {
             "label": "CMake: Configure Debug",

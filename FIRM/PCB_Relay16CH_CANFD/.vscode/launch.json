@@ -14,7 +14,13 @@
                 "target/stm32h7x.cfg"
             ],
             "runToEntryPoint": "main",
-            "preLaunchTask": "CMake: Build Debug"
+            "preLaunchTask": "CMake: Build Debug",
+            "showDevDebugOutput": "raw",
+            "gdbLaunchTimeout": 20000,
+            "windows": {
+                "serverpath": "C:/Users/wei/AppData/Local/Microsoft/WinGet/Packages/xpack-dev-tools.openocd-xpack_Microsoft.Winget.Source_8wekyb3d8bbwe/xpack-openocd-0.12.0-7/bin/openocd.exe",
+                "gdbPath": "D:/Compiler/ArmGunToolchain/bin/arm-none-eabi-gdb.exe"
+            }
         },
         {
             "name": "Debug STM32H750 (J-Link)",
@@ -29,7 +35,13 @@
                 "target/stm32h7x.cfg"
             ],
             "runToEntryPoint": "main",
-            "preLaunchTask": "CMake: Build Debug"
+            "preLaunchTask": "CMake: Build Debug",
+            "showDevDebugOutput": "raw",
+            "gdbLaunchTimeout": 20000,
+            "windows": {
+                "serverpath": "C:/Users/wei/AppData/Local/Microsoft/WinGet/Packages/xpack-dev-tools.openocd-xpack_Microsoft.Winget.Source_8wekyb3d8bbwe/xpack-openocd-0.12.0-7/bin/openocd.exe",
+                "gdbPath": "D:/Compiler/ArmGunToolchain/bin/arm-none-eabi-gdb.exe"
+            }
         }
     ]
 }
