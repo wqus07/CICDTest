@@ -1,0 +1,175 @@
+name: Firmware CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'FIRM/PCB_Relay16CH_CANFD/**'
+      - '.github/workflows/firmware-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'FIRM/PCB_Relay16CH_CANFD/**'
+      - '.github/workflows/firmware-ci.yml'
+
+env:
+  FIRMWARE_DIR: FIRM/PCB_Relay16CH_CANFD
+
+jobs:
+  # ── 1. Build Debug & Release ─────────────────────────────
+  build:
+    name: Build Firmware
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi \
+            libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib \
+            cmake ninja-build
+
+      - name: Verify toolchain
+        run: |
+          arm-none-eabi-gcc --version
+          cmake --version
+          ninja --version
+
+      - name: CMake Configure
+        working-directory: ${{ env.FIRMWARE_DIR }}
+        run: cmake --preset ${{ matrix.build_type }} -B build
+
+      - name: Build
+        working-directory: ${{ env.FIRMWARE_DIR }}
+        run: cmake --build build --config ${{ matrix.build_type }}
+
+      - name: Binary size report
+        working-directory: ${{ env.FIRMWARE_DIR }}
+        run: |
+          echo "### ${{ matrix.build_type }} Build Size" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          arm-none-eabi-size build/Relay16CH_H750.elf >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate HEX
+        working-directory: ${{ env.FIRMWARE_DIR }}
+        run: arm-none-eabi-objcopy -O ihex build/Relay16CH_H750.elf build/Relay16CH_H750.hex
+
+      - name: Check Flash usage
+        working-directory: ${{ env.FIRMWARE_DIR }}
+        run: |
+          TEXT_SIZE=$(arm-none-eabi-size build/Relay16CH_H750.elf | tail -1 | awk '{print $1}')
+          DATA_SIZE=$(arm-none-eabi-size build/Relay16CH_H750.elf | tail -1 | awk '{print $2}')
+          FLASH_USED=$((TEXT_SIZE + DATA_SIZE))
+          FLASH_TOTAL=131072  # 128 KB
+          PERCENT=$((FLASH_USED * 100 / FLASH_TOTAL))
+          echo "Flash: ${FLASH_USED}/${FLASH_TOTAL} bytes (${PERCENT}%)"
+          if [ "$PERCENT" -gt 90 ]; then
+            echo "::warning::Flash usage at ${PERCENT}% - approaching limit!"
+          fi
+
+      - name: Upload artifacts
+        if: matrix.build_type == 'Release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-release-${{ github.sha }}
+          path: |
+            ${{ env.FIRMWARE_DIR }}/build/Relay16CH_H750.elf
+            ${{ env.FIRMWARE_DIR }}/build/Relay16CH_H750.hex
+            ${{ env.FIRMWARE_DIR }}/build/Relay16CH_H750.map
+          retention-days: 90
+
+  # ── 2. Static Analysis ───────────────────────────────────
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: sudo apt-get update && sudo apt-get install -y cppcheck
+
+      - name: Run cppcheck
+        working-directory: ${{ env.FIRMWARE_DIR }}
+        run: |
+          cppcheck --enable=warning,performance,portability \
+            --suppress=missingIncludeSystem \
+            --inline-suppr \
+            --error-exitcode=1 \
+            -I Inc/ \
+            -I Drivers/STM32H7xx_HAL_Driver/Inc/ \
+            -I Drivers/CMSIS/Device/ST/STM32H7xx/Include/ \
+            -I Drivers/CMSIS/Include/ \
+            -DUSE_HAL_DRIVER -DSTM32H750xx \
+            Src/relays.c Src/base_ID_general_api.c \
+            2>&1 | tee cppcheck-report.txt
+
+      - name: Report results
+        if: always()
+        working-directory: ${{ env.FIRMWARE_DIR }}
+        run: |
+          echo "### Static Analysis Results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat cppcheck-report.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # ── 3. Size Diff (PR only) ──────────────────────────────
+  size-diff:
+    name: Size Diff
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi \
+            libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib \
+            cmake ninja-build
+
+      - name: Build PR branch
+        working-directory: ${{ env.FIRMWARE_DIR }}
+        run: |
+          cmake --preset Release -B build
+          cmake --build build --config Release
+          arm-none-eabi-size build/Relay16CH_H750.elf | tail -1 > /tmp/pr-size.txt
+
+      - name: Build base branch
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git checkout origin/${{ github.base_ref }}
+          cd ${{ env.FIRMWARE_DIR }}
+          rm -rf build
+          cmake --preset Release -B build
+          cmake --build build --config Release
+          arm-none-eabi-size build/Relay16CH_H750.elf | tail -1 > /tmp/base-size.txt
+
+      - name: Compare sizes
+        run: |
+          BASE_TEXT=$(awk '{print $1}' /tmp/base-size.txt)
+          BASE_DATA=$(awk '{print $2}' /tmp/base-size.txt)
+          BASE_BSS=$(awk '{print $3}' /tmp/base-size.txt)
+          PR_TEXT=$(awk '{print $1}' /tmp/pr-size.txt)
+          PR_DATA=$(awk '{print $2}' /tmp/pr-size.txt)
+          PR_BSS=$(awk '{print $3}' /tmp/pr-size.txt)
+          DIFF_TEXT=$((PR_TEXT - BASE_TEXT))
+          DIFF_DATA=$((PR_DATA - BASE_DATA))
+          DIFF_BSS=$((PR_BSS - BASE_BSS))
+          DIFF_FLASH=$((DIFF_TEXT + DIFF_DATA))
+          DIFF_RAM=$((DIFF_DATA + DIFF_BSS))
+          echo "### Firmware Size Diff (Release)" >> $GITHUB_STEP_SUMMARY
+          echo "| Section | Base | PR | Diff |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|------|----|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| text | ${BASE_TEXT} | ${PR_TEXT} | ${DIFF_TEXT:+${DIFF_TEXT}} |" >> $GITHUB_STEP_SUMMARY
+          echo "| data | ${BASE_DATA} | ${PR_DATA} | ${DIFF_DATA:+${DIFF_DATA}} |" >> $GITHUB_STEP_SUMMARY
+          echo "| bss | ${BASE_BSS} | ${PR_BSS} | ${DIFF_BSS:+${DIFF_BSS}} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Flash** | $((BASE_TEXT+BASE_DATA)) | $((PR_TEXT+PR_DATA)) | **${DIFF_FLASH}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| **RAM** | $((BASE_DATA+BASE_BSS)) | $((PR_DATA+PR_BSS)) | **${DIFF_RAM}** |" >> $GITHUB_STEP_SUMMARY

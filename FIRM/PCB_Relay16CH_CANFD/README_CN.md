@@ -285,3 +285,17 @@ openocd --version
 ```
 
 若上述命令能输出路径与版本，则 VSCode `Ctrl+Shift+B` 编译和 `F5` 调试均可直接使用。
+
+---
+
+## CI/CD 自动化
+
+推送代码或提交 PR 时，GitHub Actions 自动执行固件 CI 流水线（`.github/workflows/firmware-ci.yml`）：
+
+| Job | 触发条件 | 说明 |
+|-----|----------|------|
+| **Build** | push / PR | Debug + Release 双配置编译，Flash/RAM 占用报告，Release 产物（ELF/HEX/MAP）上传保留 90 天 |
+| **Static Analysis** | push / PR | cppcheck 扫描用户源码（relays.c、base_ID_general_api.c），检查 warning / performance / portability |
+| **Size Diff** | 仅 PR | 对比 PR 与 base 分支的 text/data/bss 体积变化，结果显示在 PR Summary |
+
+流水线仅在 `FIRM/PCB_Relay16CH_CANFD/` 目录有文件变更时触发，不影响其他部分的 CI。
