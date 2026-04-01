@@ -64,6 +64,18 @@ arm-none-eabi-gdb --version
 openocd --version
 ```
 
+## CI/CD
+
+推送到 `main`/`develop` 或提交 PR 时，GitHub Actions 自动运行固件流水线（仅固件目录有变更时触发）：
+
+| Job | 说明 |
+|-----|------|
+| **Build** | Debug + Release 双配置编译，报告 Flash/RAM 占用，Release 产物上传 |
+| **Static Analysis** | cppcheck 扫描用户代码（warning / performance / portability） |
+| **Size Diff** | PR 时对比 base 分支的二进制体积变化 |
+
+工作流配置：`.github/workflows/firmware-ci.yml`
+
 ## 详细说明
 
 详细使用指南请看：`FIRM/PCB_Relay16CH_CANFD/README_CN.md`
