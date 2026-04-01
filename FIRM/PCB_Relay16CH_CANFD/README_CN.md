@@ -264,3 +264,22 @@ text    data     bss     dec      hex
 ---
 
 **需要帮助？查看 `COMPILE_GUIDE.md` 获取更多详细信息。**
+
+---
+
+## Windows 与 macOS 兼容说明
+
+为保证 Windows 与 macOS 都可直接使用，调试配置采用平台分离策略：
+
+1. **Windows**: `launch.json` 使用 `windows` 专用字段固定 `openocd` 与 `arm-none-eabi-gdb` 的绝对路径，避免 VSCode 找不到可执行文件。
+2. **macOS**: 不使用固定路径，仍通过 `PATH` 自动解析 `openocd` 与 `arm-none-eabi-gdb`，保持原使用方式不变。
+
+macOS 自检命令如下（终端执行）：
+```bash
+which arm-none-eabi-gdb
+which openocd
+arm-none-eabi-gdb --version
+openocd --version
+```
+
+若上述命令能输出路径与版本，则 VSCode 调试可直接使用。
