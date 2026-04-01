@@ -269,10 +269,12 @@ text    data     bss     dec      hex
 
 ## Windows 与 macOS 兼容说明
 
-为保证 Windows 与 macOS 都可直接使用，调试配置采用平台分离策略：
+为保证 Windows 与 macOS 都可直接使用，构建与调试配置采用平台分离策略：
 
-1. **Windows**: `launch.json` 使用 `windows` 专用字段固定 `openocd` 与 `arm-none-eabi-gdb` 的绝对路径，避免 VSCode 找不到可执行文件。
-2. **macOS**: 不使用固定路径，仍通过 `PATH` 自动解析 `openocd` 与 `arm-none-eabi-gdb`，保持原使用方式不变。
+| 配置文件 | Windows | macOS / Linux |
+|----------|---------|---------------|
+| `launch.json` | `windows` 字段固定 `openocd`、`gdb` 绝对路径 | 通过 `PATH` 自动解析 |
+| `tasks.json` | `windows` 平台块：`powershell.exe` + WinGet PATH | 系统默认 shell（zsh/bash），工具链来自 Homebrew 或包管理器 |
 
 macOS 自检命令如下（终端执行）：
 ```bash
@@ -282,4 +284,4 @@ arm-none-eabi-gdb --version
 openocd --version
 ```
 
-若上述命令能输出路径与版本，则 VSCode 调试可直接使用。
+若上述命令能输出路径与版本，则 VSCode `Ctrl+Shift+B` 编译和 `F5` 调试均可直接使用。

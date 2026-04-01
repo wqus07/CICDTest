@@ -52,8 +52,8 @@ cmake --build build --config Debug
 
 ## Windows 与 macOS 兼容说明
 
-- Windows 调试在 `launch.json` 中使用 `windows` 专用字段固定 `openocd` 与 `arm-none-eabi-gdb` 路径。
-- macOS 保持使用 `PATH` 自动解析，原使用方式不变。
+- `launch.json`：Windows 使用 `windows` 字段固定 `openocd` 与 `arm-none-eabi-gdb` 绝对路径；macOS/Linux 通过 `PATH` 自动解析。
+- `tasks.json`：Windows 使用 `powershell.exe` + WinGet PATH（配置在 `windows` 平台块内）；macOS/Linux 使用系统默认 shell（zsh/bash），工具链来自 Homebrew 或系统包管理器。
 
 macOS 自检命令：
 
