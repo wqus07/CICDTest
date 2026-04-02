@@ -223,6 +223,11 @@ cmake --build build --config Debug
 | `openocd_stlink.cfg` | ST-Link配置文件 |
 | `openocd_jlink.cfg` | J-Link配置文件 |
 | `COMPILE_GUIDE.md` | 详细编译指南 |
+| `UDS/uds_config.h` | UDS 可移植配置 |
+| `UDS/uds_tp.h/.c` | ISO-TP 传输层 |
+| `UDS/uds_flash.h/.c` | Flash 驱动抽象 |
+| `UDS/uds_service.h/.c` | UDS 诊断服务 |
+| `UDS/uds.h/.c` | UDS 集成入口 |
 
 ---
 
@@ -285,6 +290,172 @@ openocd --version
 ```
 
 若上述命令能输出路径与版本，则 VSCode `Ctrl+Shift+B` 编译和 `F5` 调试均可直接使用。
+
+---
+
+## UDS 固件升级模块 (CAN 总线 OTA)
+
+### 模块概述
+
+`UDS/` 目录包含完整的 ISO 14229 (UDS) + ISO 15765-2 (ISO-TP) 固件升级模块，独立于业务代码，可移植到其他 STM32 项目。
+
+```
+UDS/
+├── uds_config.h       ← 可移植配置（CAN ID、Flash 布局、时序参数）
+├── uds_tp.h / .c      ← ISO 15765-2 传输层（多帧分段/重组）
+├── uds_flash.h / .c   ← Flash 驱动（RAM 缓存 → 整体擦写）
+├── uds_service.h / .c ← UDS 诊断服务（10/27/34/36/37/31/11/22/3E）
+└── uds.h / .c         ← 集成入口 + CAN 硬件适配
+```
+
+### CAN 通信参数
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| 物理请求 ID | `0x7E0` | Tester → ECU |
+| 物理响应 ID | `0x7E8` | ECU → Tester |
+| 功能请求 ID | `0x7DF` | 广播 |
+| ID 类型 | Standard 11-bit | UDS 诊断用标准帧 |
+| 帧格式 | Classic CAN (8 bytes) | 兼容所有 CAN 工具 |
+
+### 集成步骤（3 步）
+
+**1. 在 `relays.c` 的 `Relays_Start()` 中初始化 UDS（FDCAN 启动之后）：**
+
+```c
+#include "uds.h"
+
+void Relays_Start(void) {
+    // ... 现有 FDCAN 初始化代码 ...
+    HAL_FDCAN_Start(&hfdcan1);
+    HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
+
+    uds_init();  // ← 添加这一行
+
+    // ... 其余代码 ...
+}
+```
+
+**2. 在 CAN 接收回调中路由 UDS 帧（`HAL_FDCAN_RxFifo0Callback`）：**
+
+```c
+void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef* hfdcan, uint32_t RxFifo0ITs) {
+    uint32_t mid;
+    FDCAN_RxHeaderTypeDef FDCAN1_RxHeader;
+    HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &FDCAN1_RxHeader, &RxCANDataBuffer[0]);
+    mid = FDCAN1_RxHeader.Identifier;
+
+    // ── UDS 帧路由（标准帧 0x7E0 / 0x7DF）──
+    if (FDCAN1_RxHeader.IdType == FDCAN_STANDARD_ID) {
+        if (mid == 0x7E0 || mid == 0x7DF) {
+            uint8_t dlc = FDCAN1_RxHeader.DataLength >> 16;  // 转换为字节数
+            uds_can_rx(RxCANDataBuffer, dlc);
+        }
+    }
+
+    // ── 现有的继电器业务逻辑（扩展帧）──
+    if (FDCAN1_RxHeader.IdType == FDCAN_EXTENDED_ID) {
+        // ... 现有代码不变 ...
+    }
+
+    HAL_FDCAN_ActivateNotification(hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
+}
+```
+
+**3. 在 `main.c` 的主循环中处理 UDS 消息：**
+
+```c
+#include "uds.h"
+
+while (1) {
+    uds_process();  // ← 添加这一行
+}
+```
+
+### CANoe 刷写配置
+
+**CAPL 测试脚本示例：**
+
+```capl
+variables {
+    message 0x7E0 uds_req;
+}
+
+// 1. 进入编程会话
+on key 'p' {
+    uds_req.dlc = 8;
+    uds_req.byte(0) = 0x02;  // SF: length=2
+    uds_req.byte(1) = 0x10;  // DiagSessionControl
+    uds_req.byte(2) = 0x02;  // programmingSession
+    output(uds_req);
+}
+
+// 2. 请求 Seed
+on key 's' {
+    uds_req.dlc = 8;
+    uds_req.byte(0) = 0x02;
+    uds_req.byte(1) = 0x27;  // SecurityAccess
+    uds_req.byte(2) = 0x01;  // requestSeed
+    output(uds_req);
+}
+
+// 3. 发送 Key（收到 seed 后计算: key = seed XOR 0x12345678）
+on message 0x7E8 {
+    if (this.byte(1) == 0x67 && this.byte(2) == 0x01) {
+        dword seed = (this.byte(3) << 24) | (this.byte(4) << 16) |
+                     (this.byte(5) << 8) | this.byte(6);
+        dword key = seed ^ 0x12345678;
+        uds_req.byte(0) = 0x06;
+        uds_req.byte(1) = 0x27;
+        uds_req.byte(2) = 0x02;  // sendKey
+        uds_req.byte(3) = (key >> 24) & 0xFF;
+        uds_req.byte(4) = (key >> 16) & 0xFF;
+        uds_req.byte(5) = (key >> 8) & 0xFF;
+        uds_req.byte(6) = key & 0xFF;
+        output(uds_req);
+    }
+}
+```
+
+**CANoe 诊断刷写完整流程：**
+
+```
+1. DiagSessionControl (0x10 0x02)     → 进入编程会话
+2. SecurityAccess     (0x27 0x01/02)  → 安全认证 (seed/key)
+3. RoutineControl     (0x31 0x01 FF00)→ 擦除内存准备
+4. RequestDownload    (0x34)          → 开始下载 (地址=0x08000000, 大小=固件字节数)
+5. TransferData       (0x36) x N      → 逐块传输固件数据 (每块最大 4102 字节, ISO-TP 多帧)
+6. TransferExit       (0x37)          → 传输完成
+7. RoutineControl     (0x31 0x01 0202)→ CRC 完整性校验
+8. ECUReset           (0x11 0x01)     → 硬复位 → 写入 Flash → 启动新固件
+```
+
+### Security Access 算法
+
+当前使用简单算法，便于测试：
+
+```
+Key = Seed XOR 0x12345678
+```
+
+在 CANoe 的 CAPL/ODX/CDD 中配置相同算法即可。生产环境应替换 `uds_service.c` 中的 `verify_key()` 为 AES 或其他安全算法。
+
+### STM32H750 Flash 特殊说明
+
+STM32H750 仅有 **1 个 128 KB Flash 扇区**，无法局部擦除。刷写策略：
+
+```
+TransferData → 数据写入 AXI-SRAM 缓冲区 (0x24010000, 128 KB)
+                           ↓
+ECUReset → 关中断 → 擦除整个 Flash Bank → 从 RAM 写入 Flash → 复位
+```
+
+### 移植到其他项目
+
+1. 复制 `UDS/` 目录到新项目
+2. 修改 `uds_config.h` 中的平台参数（CAN ID、Flash 地址、RAM 缓冲区地址）
+3. 在 `uds.c` 中适配 `uds_tp_can_send()` 为新项目的 CAN 发送函数
+4. 按上述 3 步集成到应用
 
 ---
 
