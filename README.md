@@ -64,6 +64,17 @@ arm-none-eabi-gdb --version
 openocd --version
 ```
 
+## UDS 固件升级
+
+`FIRM/PCB_Relay16CH_CANFD/UDS/` 提供基于 CAN 总线的 UDS (ISO 14229) 固件升级模块：
+
+- CAN ID：物理 `0x7E0`/`0x7E8`，功能 `0x7DF`（标准 11-bit）
+- 支持服务：DiagSessionControl / SecurityAccess / RequestDownload / TransferData / RoutineControl / ECUReset
+- 兼容 CANoe、PCAN-Explorer 等上位机工具进行刷写
+- 独立模块，可移植到其他 STM32 项目
+
+详细集成步骤和 CANoe CAPL 脚本示例请看 `FIRM/PCB_Relay16CH_CANFD/README_CN.md`。
+
 ## CI/CD
 
 推送到 `main`/`develop` 或提交 PR 时，GitHub Actions 自动运行固件流水线（仅固件目录有变更时触发）：

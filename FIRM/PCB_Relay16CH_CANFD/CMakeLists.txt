@@ -47,11 +47,17 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
     Src/relays.c
     Src/base_ID_general_api.c
+    # UDS firmware update module
+    UDS/uds.c
+    UDS/uds_tp.c
+    UDS/uds_service.c
+    UDS/uds_flash.c
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
+    UDS
 )
 
 # Add project symbols (macros)
